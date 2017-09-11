@@ -8,7 +8,7 @@ Install with [Composer](http://getcomposer.org/)
 
 Add `cahkampung/landa-db` to require in composer.json
 
-`"require": { "cahkampung/landa-db": "^1.1" },`
+`"require": { "cahkampung/landa-db": "^1.0" },`
 
 or run in terminal 
 
