@@ -22,6 +22,7 @@ class Migrasi
      */
     public function __construct($setting)
     {
+        $this->path = $setting['path'];
 
         $this->db = mysqli_connect($setting['host'], $setting['username'], $setting['password'], $setting['database']);
 
@@ -61,36 +62,58 @@ class Migrasi
             $list = mysqli_query($this->db, "SELECT * FROM migrasi");
 
             while ($row = mysqli_fetch_array($list, MYSQLI_ASSOC)) {
-                $file = $row['nama'];
+                $file[] = $row['nama'];
             }
         }
+
+        return $file;
     }
 
     public function migrasi()
     {
-        
-        $filename = 'src/migrasi.sql';
-        $templine = '';
+        $tableMigrated = $this->get_migrasi();
+        $path          = $this->path;
 
-        $lines = file($filename);
-        foreach ($lines as $line) {
-            // Skip it if it's a comment
-            if (substr($line, 0, 2) == '--' || $line == '') {
-                continue;
-            }
+        $files = array_diff(scandir($path), array('.', '..'));
+        usort($files, function ($a, $b) {
+            return filemtime($a) < filemtime($b);
+        });
 
-            // Add this line to the current segment
-            $templine .= $line;
-            // If it has a semicolon at the end, it's the end of the query
-            if (substr(trim($line), -1, 1) == ';') {
-                // Perform the query
-                if (!mysqli_query($this->db, $templine)) {
-                    print('Error performing query \'<strong>' . $templine . '\': ' . mysql_error() . '<br /><br />');
+        foreach ($files as $key => $val) {
+            if (!in_array($val, $tableMigrated)) {
+                $filename = $this->path . "/" . $val;
+                $templine = "";
+
+                print('<strong>File ' . $filename . ' </strong>');
+                print('<ul>');
+
+                $lines = file($filename);
+                foreach ($lines as $line) {
+                    // Skip it if it's a comment
+                    if (substr($line, 0, 2) == '/*' || substr($line, 0, 2) == '--' || $line == '') {
+                        continue;
+                    }
+
+                    // Add this line to the current segment
+                    $templine .= $line;
+                    // If it has a semicolon at the end, it's the end of the query
+                    if (substr(trim($line), -1, 1) == ';') {
+                        // Perform the query
+                        if (!mysqli_query($this->db, $templine)) {
+                            print('<li>Terjadi kesalahan \'' . $templine . '<strong>\' : ' . mysqli_error($this->db) . '</li>');
+                        } else {
+                            print('<li>Berhasil dieksekusi <strong>\'' . $templine . '\'</strong> </li>');
+                        }
+
+                        // Reset temp variable to empty
+                        $templine = '';
+                    }
+
+                    print('</ul>');
                 }
-                // Reset temp variable to empty
-                $templine = '';
-            }
 
+                mysqli_query($this->db, "insert into migrasi(nama) values ('" . $val . "')");
+            }
         }
     }
 }
